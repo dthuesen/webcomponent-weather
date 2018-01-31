@@ -1,0 +1,125 @@
+<!-- **************************************
+     Web Component in low level code format
+     ************************************** -->
+
+
+<!-- 1) The HTML template -->
+<template id="weather-info">
+    <style>
+        :host {
+            /* border-color: rgb(255, 255, 255);
+            border-style: dashed;
+            border-width: 1px;
+            border-radius: 3px; */
+            display: block;
+            /* margin: 5rem auto; */
+            /* max-width: 30rem; */
+            padding: 1rem;
+
+            /* background-color: rgba(135, 185, 250, 0.432); */
+            /* box-shadow: .5rem .5rem 1.5rem rgba(0, 0, 0, .3); */
+            font-family: monospace;
+            font-weight: 200;
+        }
+
+        :host:hover {
+            background-color: rgba(135, 206, 250, 0.6);
+        }
+
+        h1 {
+            font-weight: 400;
+        }
+    </style>
+    <h1>
+        <img> Weather in
+        <span id="city"></span>
+    </h1>
+    <h3>
+        <span id="temperature"></span> -
+        <span id="description"></span>
+    </h3>
+</template>
+
+<!-- 2) The JavaScript -->
+<script>
+    ///// Get access to the template - because 'document' belongs to the whole app 'currentScript.ownerDocument' 
+    ///// is the access to the template of this special web component.
+    const tpl = (document.currentScript || document._currentScript).ownerDocument.querySelector('template').content;
+    const OPEN_WEATHERMAP_API_KEY = '5dc917e18e833e212d94953d66b80e20';
+
+    class WeatherInfo extends HTMLElement {
+
+        static get observedAttributes() {
+            return ['city', 'imperial'];
+        }
+
+        get city() {
+            return this.getAttribute('city');
+        }
+        set city(newCity) {
+            this.setAttribute('city', newCity);
+        }
+
+        get imperial() {
+            return this.hasAttribute('imperial');
+        }
+
+        set imperial(isImperial) {
+            if (isImperial) {
+                this.setAttribute('imperial', '');
+            } else {
+                this.removeAttribute('imperial');
+            }
+        }
+
+        ///// Callback function when an attribute changed.
+        attributeChangedCallback(name, oldValue, newValue) {
+            this.update();
+            console.log('updated Values: ', name, oldValue, newValue);
+        }
+
+        ///// This callback function will be called when the web component is connected to the DOM
+        ///// That means when it is visible in the page.
+        connectedCallback() {
+            ///// this give access to the outside 
+            this.attachShadow({ mode: 'open' });
+
+            ///// First putting the template in a variable - 'true' for deep import...
+            const content = document.importNode(tpl, true);
+            // ... then appending the variable to the shadow dom.
+            this.shadowRoot.appendChild(content);
+
+            this.update();
+
+            console.log('Hello from WeatherInfo Web Component! Just connected.');
+        }
+
+        ///// This function will be called by the connected and the attributeChange callback function every time there's a change.
+        update() {
+            if (!this.shadowRoot) return;
+            this.shadowRoot.querySelector('#city').textContent = this.city;
+            ///// fetch from Open Weather Map API
+            const unit = this.imperial ? 'imperial' : 'metric';
+            fetch(`http://api.openweathermap.org/data/2.5/weather?q=${this.city}&units=${unit}&appid=${OPEN_WEATHERMAP_API_KEY}`)
+                // 
+                .then((result) => { return result.json() })
+                .then((result) => {
+                    ///// Fill the template with the result
+                    this.shadowRoot.querySelector('#temperature').textContent = `${result.main.temp} °${this.imperial ? 'F' : 'C'}`;
+                    this.shadowRoot.querySelector('#description').textContent = result.weather[0].main;
+                    this.shadowRoot.querySelector('img').src = `http://openweathermap.org/img/w/${result.weather[0].icon}.png`;
+
+                    this.dispatchEvent(new CustomEvent('load', {
+                        detail: {
+                            temperature: `${result.main.temp} °${this.imperial ? 'F' : 'C'}`,
+                            description: result.weather[0].main
+                        }
+                    }))
+                })
+        }
+
+    }
+
+    ///// Defining the custom element
+    customElements.define('weather-info', WeatherInfo);
+</script>
